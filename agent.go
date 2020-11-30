@@ -6,6 +6,8 @@ import (
 	"net"
 	"os"
 
+	"alechenninger.com/haproxy-go-extensions/headers"
+
 	"github.com/negasus/haproxy-spoe-go/action"
 	"github.com/negasus/haproxy-spoe-go/agent"
 	"github.com/negasus/haproxy-spoe-go/request"
@@ -14,13 +16,18 @@ import (
 )
 
 var r = rego.New(
-	rego.Query("x = data.example.allow"),
-	rego.Load([]string{"./example.rego"}, nil))
+	rego.Query(os.Args[2]),
+	rego.Load([]string{os.Args[1]}, nil))
 
 var ctx = context.TODO()
 
 func main() {
 	log.Print("listen 9000")
+
+	query, err := r.PrepareForEval(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	listener, err := net.Listen("tcp4", "127.0.0.1:9000")
 	if err != nil {
@@ -29,42 +36,42 @@ func main() {
 	}
 	defer listener.Close()
 
+	// TODO: test this
 	handler := func(req *request.Request) {
-
 		log.Printf("handle request EngineID: '%s', StreamID: '%d', FrameID: '%d' with %d messages\n", req.EngineID, req.StreamID, req.FrameID, req.Messages.Len())
 
-		// messageName := "get-ip-reputation"
+		mes, err := req.Messages.GetByName("goagent")
+		if err != nil {
+			log.Printf("no goagent message: %v", err)
+			return
+		}
 
-		// mes, err := req.Messages.GetByName(messageName)
-		// if err != nil {
-		// 	log.Printf("message %s not found: %v", messageName, err)
-		// 	return
-		// }
+		items := mes.KV.Data()
+		input := make(map[string]interface{}, len(items))
 
-		// mes.KV.Get("test")
+		for _, i := range items {
+			// TODO: configurable header argument name?
+			if i.Name == "header" {
+				hdrBytes := i.Value.([]byte)
+				input[i.Name] = headers.ParseHeaders(hdrBytes)
+			} else {
+				input[i.Name] = i.Value
+			}
+		}
 
-		// ipValue, ok := mes.KV.Get("ip")
-		// if !ok {
-		// 	log.Printf("var 'ip' not found in message")
-		// 	return
-		// }
-
-		// ip, ok := ipValue.(net.IP)
-		// if !ok {
-		// 	log.Printf("var 'ip' has wrong type. expect IP addr")
-		// 	return
-		// }
-
-		// ipScore := rand.Intn(100)
-
-		// log.Printf("IP: %s, send score '%d'", ip.String(), ipScore)
-		rs, err := r.Eval(ctx)
+		rs, err := query.Eval(ctx, rego.EvalInput(input))
 		if err != nil {
 			log.Printf("Error evaluating rego %v", err)
 			return
 		}
 
-		req.Actions.SetVar(action.ScopeSession, "test", rs[0].Bindings["x"])
+		if len(rs) == 0 {
+			return
+		}
+
+		for k, v := range rs[0].Bindings {
+			req.Actions.SetVar(action.ScopeSession, k, v)
+		}
 	}
 
 	a := agent.New(handler)
