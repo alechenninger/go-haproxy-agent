@@ -53,11 +53,17 @@ func main() {
 			// TODO: configurable header argument name?
 			if i.Name == "header" {
 				hdrBytes := i.Value.([]byte)
-				input[i.Name] = headers.ParseHeaders(hdrBytes)
+				input[i.Name], _, err = headers.ParseHeaders(hdrBytes)
+				if err != nil {
+					log.Printf("Error parsing headers %v", err)
+					return
+				}
 			} else {
 				input[i.Name] = i.Value
 			}
 		}
+
+		log.Println(input)
 
 		rs, err := query.Eval(ctx, rego.EvalInput(input))
 		if err != nil {
