@@ -55,13 +55,13 @@ func ParseHeaders(buf []byte) (header http.Header, bytes int, err error) {
 
 // Parse string from buffer according to SPOP string type.
 func str(buffer []byte) (str string, bytes int, err error) {
-	strLength, bytes := varint.Uvarint(buffer)
+	length, bytes := varint.Uvarint(buffer)
 	buffer = buffer[bytes:]
-	if len(buffer) < int(strLength) {
+	if len(buffer) < int(length) {
 		err = typeddata.ErrDecodingBufferTooSmall
 		return
 	}
-	str = string(buffer[:strLength])
-	bytes += int(strLength)
+	str = string(buffer[:length])
+	bytes += int(length)
 	return str, bytes, err
 }
