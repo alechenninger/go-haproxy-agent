@@ -36,9 +36,20 @@ func main() {
 	}
 	defer listener.Close()
 
-	// TODO: test this
-	handler := func(req *request.Request) {
-		log.Printf("handle request EngineID: '%s', StreamID: '%d', FrameID: '%d' with %d messages\n", req.EngineID, req.StreamID, req.FrameID, req.Messages.Len())
+	handler := opaHandler(query)
+
+	a := agent.New(handler)
+
+	if err := a.Serve(listener); err != nil {
+		log.Printf("error agent serve: %+v\n", err)
+	}
+}
+
+// TODO: test this
+func opaHandler(query rego.PreparedEvalQuery) func(*request.Request) {
+	return func(req *request.Request) {
+		log.Printf("handle request EngineID: '%s', StreamID: '%d', FrameID: '%d' with %d messages\n",
+			req.EngineID, req.StreamID, req.FrameID, req.Messages.Len())
 
 		mes, err := req.Messages.GetByName("goagent")
 		if err != nil {
@@ -46,20 +57,20 @@ func main() {
 			return
 		}
 
-		items := mes.KV.Data()
-		input := make(map[string]interface{}, len(items))
+		args := mes.KV.Data()
+		input := make(map[string]interface{}, len(args))
 
-		for _, i := range items {
+		for _, arg := range args {
 			// TODO: configurable header argument name?
-			if i.Name == "header" {
-				hdrBytes := i.Value.([]byte)
-				input[i.Name], _, err = headers.ParseHeaders(hdrBytes)
+			if arg.Name == "header" {
+				hdrBytes := arg.Value.([]byte)
+				input[arg.Name], _, err = headers.ParseHeaders(hdrBytes)
 				if err != nil {
 					log.Printf("Error parsing headers %v", err)
 					return
 				}
 			} else {
-				input[i.Name] = i.Value
+				input[arg.Name] = arg.Value
 			}
 		}
 
@@ -76,13 +87,8 @@ func main() {
 		}
 
 		for k, v := range rs[0].Bindings {
-			req.Actions.SetVar(action.ScopeSession, k, v)
+			log.Printf("%v : %v", k, v)
+			req.Actions.SetVar(action.ScopeRequest, k, v)
 		}
-	}
-
-	a := agent.New(handler)
-
-	if err := a.Serve(listener); err != nil {
-		log.Printf("error agent serve: %+v\n", err)
 	}
 }
