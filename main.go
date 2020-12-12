@@ -1,13 +1,46 @@
-package headers
+package main
 
 import (
+	"context"
+	"log"
+	"net"
 	"net/http"
+	"os"
 
+	"github.com/negasus/haproxy-spoe-go/agent"
+	"github.com/negasus/haproxy-spoe-go/request"
 	"github.com/negasus/haproxy-spoe-go/typeddata"
 	"github.com/negasus/haproxy-spoe-go/varint"
+
+	"github.com/open-policy-agent/opa/rego"
 )
 
-// ParseHeaders parses haproxy req.hdrs_bin into http.Header and number of bytes read out of buffer.
+func main() {
+	log.Print("listen 9000")
+
+	query := rego.Query(os.Args[2])
+	policy := rego.Load([]string{os.Args[1]}, nil)
+	handler := regoHandler(rego.New(query, policy))
+
+	a := agent.New(func(r *request.Request) {
+		// TODO: make deadline per request configurable
+		//   should be same as haproxy agent timeout e.g. timeout processing 5s
+		handler(context.TODO(), r)
+	})
+
+	listener, err := net.Listen("tcp4", "127.0.0.1:9000")
+	if err != nil {
+		log.Printf("error create listener, %v", err)
+		os.Exit(1)
+	}
+	defer listener.Close()
+
+	if err := a.Serve(listener); err != nil {
+		log.Printf("error agent serve: %+v\n", err)
+	}
+}
+
+// headers parses haproxy req.hdrs_bin into http.Header and number of bytes read out of buffer.
 //
 // From haproxy docs:
 //
@@ -20,7 +53,7 @@ import (
 //
 //     int:  refer to the SPOE documentation for the encoding
 //     str:  <int:length><bytes>
-func ParseHeaders(buf []byte) (header http.Header, bytes int, err error) {
+func headers(buf []byte) (header http.Header, bytes int, err error) {
 	header = make(http.Header)
 
 	var name string

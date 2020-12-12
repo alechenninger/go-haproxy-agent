@@ -7,9 +7,9 @@ allow = true {                                      # allow is true if...
     request_allowed
 }
 
-role {
-    input.headers.x-user
-}
+# role {
+#     input.headers.x-user
+# }
 
 # permissions := {
 #     "anonymous": ["read"],

@@ -2,52 +2,29 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
-	"net"
-	"os"
-
-	"alechenninger.com/haproxy-go-extensions/headers"
 
 	"github.com/negasus/haproxy-spoe-go/action"
-	"github.com/negasus/haproxy-spoe-go/agent"
 	"github.com/negasus/haproxy-spoe-go/request"
 
 	"github.com/open-policy-agent/opa/rego"
 )
 
-var r = rego.New(
-	rego.Query(os.Args[2]),
-	rego.Load([]string{os.Args[1]}, nil))
-
-var ctx = context.TODO()
-
-func main() {
-	log.Print("listen 9000")
-
-	query, err := r.PrepareForEval(ctx)
+func regoHandler(rego *rego.Rego, opts ...rego.PrepareOption) func(context.Context, *request.Request) {
+	query, err := rego.PrepareForEval(context.Background(), opts...)
 	if err != nil {
+		// TODO: don't log fatal
 		log.Fatal(err)
 	}
 
-	listener, err := net.Listen("tcp4", "127.0.0.1:9000")
-	if err != nil {
-		log.Printf("error create listener, %v", err)
-		os.Exit(1)
-	}
-	defer listener.Close()
-
-	handler := opaHandler(query)
-
-	a := agent.New(handler)
-
-	if err := a.Serve(listener); err != nil {
-		log.Printf("error agent serve: %+v\n", err)
-	}
+	return regoHandlerForQuery(query)
 }
 
 // TODO: test this
-func opaHandler(query rego.PreparedEvalQuery) func(*request.Request) {
-	return func(req *request.Request) {
+func regoHandlerForQuery(query rego.PreparedEvalQuery) func(context.Context, *request.Request) {
+	return func(ctx context.Context, req *request.Request) {
+		// TODO: some of this could be shared for other kinds of handlers (that didn't use OPA)
 		log.Printf("handle request EngineID: '%s', StreamID: '%d', FrameID: '%d' with %d messages\n",
 			req.EngineID, req.StreamID, req.FrameID, req.Messages.Len())
 
@@ -64,11 +41,17 @@ func opaHandler(query rego.PreparedEvalQuery) func(*request.Request) {
 			// TODO: configurable header argument name?
 			if arg.Name == "header" {
 				hdrBytes := arg.Value.([]byte)
-				input[arg.Name], _, err = headers.ParseHeaders(hdrBytes)
+				input[arg.Name], _, err = headers(hdrBytes)
 				if err != nil {
 					log.Printf("Error parsing headers %v", err)
 					return
 				}
+			} else if arg.Name == "body" {
+				// TODO: configurable body parsing?
+				// Look at content type header?
+				var body interface{}
+				json.Unmarshal(arg.Value.([]byte), &body)
+				input[arg.Name] = body
 			} else {
 				input[arg.Name] = arg.Value
 			}
@@ -82,7 +65,8 @@ func opaHandler(query rego.PreparedEvalQuery) func(*request.Request) {
 			return
 		}
 
-		if len(rs) == 0 {
+		results := len(rs)
+		if results == 0 {
 			return
 		}
 

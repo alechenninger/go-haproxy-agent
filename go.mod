@@ -1,4 +1,4 @@
-module alechenninger.com/haproxy-go-extensions
+module github.com/alechenninger/go-haproxy-agent
 
 go 1.15
 
