@@ -5,38 +5,69 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"os"
 
 	"github.com/negasus/haproxy-spoe-go/agent"
 	"github.com/negasus/haproxy-spoe-go/request"
 	"github.com/negasus/haproxy-spoe-go/typeddata"
 	"github.com/negasus/haproxy-spoe-go/varint"
+	"github.com/spf13/cobra"
 
 	"github.com/open-policy-agent/opa/rego"
 )
 
+var rootCmd = &cobra.Command{
+	Use:   "go-haproxy-agent [rego-file] [query]",
+	Short: "haproxy spoa agent for golang extensions",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		log.Print("listen 9000")
+
+		query, err := cmd.Flags().GetString("query")
+		if err != nil {
+			return err
+		}
+		load, err := cmd.Flags().GetStringArray("load")
+		if err != nil {
+			return err
+		}
+
+		handler := regoHandler(rego.New(
+			rego.Query(query),
+			rego.Load(load, nil)))
+
+		a := agent.New(func(r *request.Request) {
+			// TODO: make deadline per request configurable
+			//   should be same as haproxy agent timeout e.g. timeout processing 5s
+			handler(context.TODO(), r)
+		})
+
+		listener, err := net.Listen("tcp4", "127.0.0.1:9000")
+		if err != nil {
+			log.Printf("error create listener, %v", err)
+			return err
+		}
+		defer listener.Close()
+
+		if err := a.Serve(listener); err != nil {
+			log.Printf("error agent serve: %+v\n", err)
+			return err
+		}
+
+		return nil
+	},
+}
+
 func main() {
-	log.Print("listen 9000")
+	rootCmd.Flags().String("query", "", "Rego query. Results will be set as variables in "+
+		"haproxy, using the same key-value pairs as in the query results. Only the first "+
+		"result in result set is used.")
+	rootCmd.MarkFlagRequired("query")
 
-	query := rego.Query(os.Args[2])
-	policy := rego.Load([]string{os.Args[1]}, nil)
-	handler := regoHandler(rego.New(query, policy))
+	rootCmd.Flags().StringArray("load", []string{}, "Path to rego policy and input files to be "+
+		"used in policy evaluation. May be passed more than once to load multiple paths.")
+	rootCmd.MarkFlagRequired("load")
 
-	a := agent.New(func(r *request.Request) {
-		// TODO: make deadline per request configurable
-		//   should be same as haproxy agent timeout e.g. timeout processing 5s
-		handler(context.TODO(), r)
-	})
-
-	listener, err := net.Listen("tcp4", "127.0.0.1:9000")
-	if err != nil {
-		log.Printf("error create listener, %v", err)
-		os.Exit(1)
-	}
-	defer listener.Close()
-
-	if err := a.Serve(listener); err != nil {
-		log.Printf("error agent serve: %+v\n", err)
+	if err := rootCmd.Execute(); err != nil {
+		log.Fatal(err)
 	}
 }
 

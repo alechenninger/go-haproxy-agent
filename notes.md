@@ -38,3 +38,9 @@ https://dave.cheney.net/2015/11/05/lets-talk-about-logging
 
 kubernetes uses combination of pflag and cobra – looks like moving towards cobra.
 docker uses cobra
+
+## as library
+
+For generic go extensibility, it needs to be a library. And then you compile your own binaries with whatever logic you want.
+
+rego could both be a package usable in users' own agents, and also be a precompiled example usable standalone.

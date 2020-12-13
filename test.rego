@@ -1,22 +1,20 @@
 package example
 
 default allow = false                               # unless otherwise defined, allow is false
-default role = "anonymous"
 
 allow = true {                                      # allow is true if...
     request_allowed
 }
 
-# role {
-#     input.headers.x-user
-# }
-
-# permissions := {
-#     "anonymous": ["read"],
-#     "authenticated": ["read", "write"]
-# }
+user := input.header["User"][0]
+roles := data.users[user]
 
 request_allowed {
     input.method == "GET"
-    # permissions[]
+    roles[_] == "read"
+}
+
+request_allowed {
+    not input.method == "GET"
+    roles[_] == "write"
 }

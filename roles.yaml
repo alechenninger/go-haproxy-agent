@@ -1,0 +1,6 @@
+users:
+  bob:
+  - read
+  - write
+  alec:
+  - read
