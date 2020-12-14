@@ -40,9 +40,9 @@ func regoHandlerForQuery(opts HandlerOpts) func(context.Context, *request.Reques
 		log.Printf("handle request EngineID: '%s', StreamID: '%d', FrameID: '%d' with %d messages\n",
 			req.EngineID, req.StreamID, req.FrameID, req.Messages.Len())
 
-		mes, err := req.Messages.GetByName("goagent")
+		mes, err := req.Messages.GetByName("request")
 		if err != nil {
-			log.Printf("no goagent message: %v", err)
+			log.Printf("no request message: %v", err)
 			return
 		}
 

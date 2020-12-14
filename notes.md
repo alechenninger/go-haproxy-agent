@@ -44,3 +44,13 @@ docker uses cobra
 For generic go extensibility, it needs to be a library. And then you compile your own binaries with whatever logic you want.
 
 rego could both be a package usable in users' own agents, and also be a precompiled example usable standalone.
+
+## dynamically configure haproxy
+
+There is some coupling to the agent and haproxy configuration; using one or both of runtime API 
+(management socket) or dataplane API (sidecar HTTP API which manages haproxy) you can pretty much
+configure anything at runtime. This blog has examples: https://www.haproxy.com/blog/haproxy-traffic-mirroring-for-real-world-testing/
+
+## server selection
+
+use-server can use a log format string which can use samples e.g. `%[var(...)]`.

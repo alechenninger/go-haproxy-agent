@@ -40,7 +40,7 @@ var rootCmd = &cobra.Command{
 			handler(context.TODO(), r)
 		})
 
-		listener, err := net.Listen("tcp4", "127.0.0.1:9000")
+		listener, err := net.Listen("unixpacket", "/var/run/gohaproxy/agent.sock")
 		if err != nil {
 			log.Printf("error create listener, %v", err)
 			return err
