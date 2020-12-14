@@ -11,18 +11,30 @@ import (
 	"github.com/open-policy-agent/opa/rego"
 )
 
-func regoHandler(rego *rego.Rego, opts ...rego.PrepareOption) func(context.Context, *request.Request) {
-	query, err := rego.PrepareForEval(context.Background(), opts...)
+func regoHandler(r *rego.Rego, opts ...rego.PrepareOption) func(context.Context, *request.Request) {
+	query, err := r.PrepareForEval(context.Background(), opts...)
 	if err != nil {
 		// TODO: don't log fatal
 		log.Fatal(err)
 	}
 
-	return regoHandlerForQuery(query)
+	return regoHandlerForQuery(HandlerOpts{
+		Query: query,
+		EvalOptions: func(in map[string]interface{}) []rego.EvalOption {
+			return []rego.EvalOption{
+				rego.EvalInput(in),
+			}
+		},
+	})
+}
+
+type HandlerOpts struct {
+	Query       rego.PreparedEvalQuery
+	EvalOptions func(map[string]interface{}) []rego.EvalOption
 }
 
 // TODO: test this
-func regoHandlerForQuery(query rego.PreparedEvalQuery) func(context.Context, *request.Request) {
+func regoHandlerForQuery(opts HandlerOpts) func(context.Context, *request.Request) {
 	return func(ctx context.Context, req *request.Request) {
 		// TODO: some of this could be shared for other kinds of handlers (that didn't use OPA)
 		log.Printf("handle request EngineID: '%s', StreamID: '%d', FrameID: '%d' with %d messages\n",
@@ -59,7 +71,7 @@ func regoHandlerForQuery(query rego.PreparedEvalQuery) func(context.Context, *re
 
 		log.Println(input)
 
-		rs, err := query.Eval(ctx, rego.EvalInput(input))
+		rs, err := opts.Query.Eval(ctx, opts.EvalOptions(input)...)
 		if err != nil {
 			log.Printf("Error evaluating rego %v", err)
 			return

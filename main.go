@@ -16,7 +16,7 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "go-haproxy-agent [rego-file] [query]",
+	Use:   "go-haproxy-agent",
 	Short: "haproxy spoa agent for golang extensions",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		log.Print("listen 9000")
