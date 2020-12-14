@@ -5,6 +5,9 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/negasus/haproxy-spoe-go/agent"
 	"github.com/negasus/haproxy-spoe-go/request"
@@ -40,7 +43,16 @@ var rootCmd = &cobra.Command{
 			handler(context.TODO(), r)
 		})
 
-		listener, err := net.Listen("unixpacket", "/var/run/gohaproxy/agent.sock")
+		var listener net.Listener
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+		go func() {
+			<-c
+			if listener != nil {
+				listener.Close()
+			}
+		}()
+		listener, err = net.Listen("unix", "agent.sock")
 		if err != nil {
 			log.Printf("error create listener, %v", err)
 			return err
