@@ -50,22 +50,27 @@ func regoHandlerForQuery(opts HandlerOpts) func(context.Context, *request.Reques
 		input := make(map[string]interface{}, len(args))
 
 		for _, arg := range args {
-			// TODO: configurable header argument name?
-			if arg.Name == "header" {
-				hdrBytes := arg.Value.([]byte)
-				input[arg.Name], _, err = headers(hdrBytes)
-				if err != nil {
-					log.Printf("Error parsing headers %v", err)
-					return
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				// TODO: configurable header argument name?
+				if arg.Name == "header" {
+					hdrBytes := arg.Value.([]byte)
+					input[arg.Name], _, err = header(hdrBytes)
+					if err != nil {
+						log.Printf("Error parsing header %v", err)
+						return
+					}
+				} else if arg.Name == "body" {
+					// TODO: configurable body parsing?
+					// Look at content type header?
+					var body interface{}
+					json.Unmarshal(arg.Value.([]byte), &body)
+					input[arg.Name] = body
+				} else {
+					input[arg.Name] = arg.Value
 				}
-			} else if arg.Name == "body" {
-				// TODO: configurable body parsing?
-				// Look at content type header?
-				var body interface{}
-				json.Unmarshal(arg.Value.([]byte), &body)
-				input[arg.Name] = body
-			} else {
-				input[arg.Name] = arg.Value
 			}
 		}
 

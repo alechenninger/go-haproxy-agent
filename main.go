@@ -71,7 +71,7 @@ func main() {
 	}
 }
 
-// headers parses haproxy req.hdrs_bin into http.Header and number of bytes read out of buffer.
+// header parses haproxy req.hdrs_bin into http.Header and number of bytes read out of buffer.
 //
 // From haproxy docs:
 //
@@ -84,7 +84,7 @@ func main() {
 //
 //     int:  refer to the SPOE documentation for the encoding
 //     str:  <int:length><bytes>
-func headers(buf []byte) (header http.Header, bytes int, err error) {
+func header(buf []byte) (header http.Header, bytes int, err error) {
 	header = make(http.Header)
 
 	var name string
